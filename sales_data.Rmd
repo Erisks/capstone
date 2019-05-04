@@ -1,0 +1,104 @@
+---
+title: "salesData"
+author: "Erika Vargas"
+date: "May 4, 2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#loading the data
+library(dplyr)
+library(magrittr)
+library(readxl)
+sales_data <- read_excel("symetra_data.xlsx")
+head(sales_data)
+```
+
+```{r}
+#cleaning the data
+sales_data <- sales_data[,-c(4,13,14,15)] #removes an empty column
+class(sales_data) # the data is a dataframe
+#renaming columns
+names(sales_data)[1:11] =
+  c("Ext_Channel", "Ext_Specialist", "ProducerID", "Parent", "Firm Name", "State", "PSuite CT", "ProductName", "Year" , "Month", "SalesAmount")
+
+head(sales_data)
+
+
+```
+
+```{r}
+#total unique producers 
+total_producers <- subset(sales_data, !duplicated(ProducerID))
+nrow(total_producers)
+```
+
+
+```{r}
+#total sales amount by producer
+SalesByProducer <- aggregate(SalesAmount~ProducerID,data=sales_data,FUN=sum)
+# top 10 Producers
+SalesByProducer %>%top_n(10)
+# Bottom 10 Producers
+SalesByProducer %>%top_n(-10)
+```
+
+```{r}
+#lloking at sales by states
+boxplot(log(SalesAmount)~State,data=total_producers, main="Sales by States", 
+   xlab="States", ylab="Sales Amount")
+```
+
+
+```{r}
+#import data with sales by year 
+ProducerSalesByyear <- read_excel("salesDistinct.xlsx")
+class(ProducerSalesByyear)
+names(ProducerSalesByyear)[1] = c("ProducerID")
+```
+
+
+```{r}
+#joining tables to consolidate the data
+data <- merge(x = total_producers, y = ProducerSalesByyear, by = "ProducerID", all = TRUE)
+head(data)
+# I will delete the 219 column because of the values are N/A
+data <- data[,-17]
+```
+
+
+
+```{r}
+#GROUPING BY YEARS
+ onesellers2014 <- subset(data, !(is.na(data$`2014`) | data$`2014`=="") | (is.na(data$`2015`) | data$`2015`=="") | (is.na(data$`2016`) | data$`2016`=="") | (is.na(data$`2017`) | data$`2017`=="") | (is.na(data$`2018`) | data$`2018`==""))
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#removing blank rows in production amount 
+
+ sales_data[!(is.na(sales_data$SalesAmount) | sales_data$SalesAmount==""), ]
+```
+
