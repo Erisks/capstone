@@ -48,9 +48,9 @@ SalesByProducer %>%top_n(-10)
 ```
 
 ```{r}
-#lloking at sales by states
-boxplot(log(SalesAmount)~State,data=total_producers, main="Sales by States", 
-   xlab="States", ylab="Sales Amount")
+#looking at sales by Month
+boxplot(log(SalesAmount)~ Month,data=total_producers, main="Sales by Month", 
+   xlab="Month", ylab="Sales Amount")
 ```
 
 
@@ -71,18 +71,71 @@ data <- data[,-17]
 ```
 
 
+#GROUPING BY YEARS
+**I would like to look at the data by years and see if I found correlations between factorss for that first sale**
+
 
 ```{r}
-#GROUPING BY YEARS
- onesellers2014 <- subset(data, !(is.na(data$`2014`) | data$`2014`=="") | (is.na(data$`2015`) | data$`2015`=="") | (is.na(data$`2016`) | data$`2016`=="") | (is.na(data$`2017`) | data$`2017`=="") | (is.na(data$`2018`) | data$`2018`==""))
+# producer with first sale in 2014
+one2014 <- data %>%
+        filter(!is.na(data$`2014`), data$`2014`!=0, data$`2014` != "-" , data$Year == 2014,
+               is.na(data$`2015`), is.na(data$`2016`), is.na(data$`2017`), is.na(data$`2018`))
+
+str(one2014)
+#changing character columns to factors 
+one2014 <- mutate_at(one2014, vars(Ext_Channel,Ext_Specialist,Parent,`Firm Name`,State,`PSuite CT`, ProductName,Year, Month), as.factor)
+
+```
+
+```{r}
+#looking at sales by month in 2014
+boxplot(log(`2014`)~ Month,data=one2014, main="Sales by Month", 
+   xlab="Month", ylab="Sales Amount")
+
+#contigency tables
+parent_Firmname <- table(one2014$`Firm Name`, one2014$Parent)
+table(one2014$Ext_Specialist,one2014$Ext_Channel)
+table(one2014$`PSuite CT`,one2014$Ext_Channel)
+#checking for independency using chi-square test 
+tbl = table(one2014$`PSuite CT`,one2014$Ext_Channel)
+chi2 <- chisq.test(tbl)
+chi2$statisti
+chi2$p.value
+
+# computing V. the smaller v, the lower the correlation)
+sqrt(chi2$statistic / sum(tbl))
+
+#ANALYZING numercial vs categorical variable using anova table 
+
+fit <- aov(one2014$`2014` ~ one2014$State, data = one2014)
+plot(fit)
+```
 
 
+
+```{r}
+#visuals of the data
+library(ggfortify)
+
+### look what kind of principal component analysis can be done with categorical data
+
+boxplot(log(`2014`)~ Ext_Channel,data=one2014, main="Sales by External Channel in 2014", 
+   xlab="Ext.Channel", ylab="Sales Amount")
+
+hist(log(one2014$`2014`), breaks = 50)
 
 ```
 
 
 
 
+```{r}
+#looking for possible predictors 
+#state
+regression2014 <- lm(log(`2014`) ~ State, data= one2014)
+summary(regression2014)
+plot(regression2014)
+```
 
 
 
