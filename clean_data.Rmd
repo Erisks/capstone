@@ -48,6 +48,8 @@ names(data)[1:14] =
 
 #since most of the variables are categorical I must convert them into factors
 library(aod)
+library(ggplot2)
+library(dplyr)
 
 #changing character columns to factors 
 data <- mutate_at(data, vars(Ext_Channel,Ext_Specialist,Parent,FirmName,State,PSuiteCT, ProductName,Year, Month, Y2016,Y2017, Y2018), as.factor)
@@ -72,9 +74,6 @@ SalesByProducer %>%top_n(10)
 SalesByProducer %>%top_n(-10)
 ```
 
-```{r}
-
-```
 
 
 #2016 Analysis
@@ -115,7 +114,7 @@ crosstab(data, row.vars = "Y2016", col.vars = "State", type = "r")
 #LOGIT REGRESSION
 #Logistic regression, also called a logit model, is used to model dichotomous outcome variables, I n this case weather the produce had a first sale or not (1 or 0). In the logit model the log odds of the outcome is modeled as a linear combination of the predictor variables.
 
-mylogit <- glm(Y2016 ~ Ext_Channel + Ext_Specialist + Parent + FirmName + State + PSuiteCT + ProductName + Month + FirstSaleAmount, data = data, family = "binomial")
+mylogit <- glm(Y2016 ~ Ext_Channel + Ext_Specialist + State + PSuiteCT + ProductName + Month + FirstSaleAmount, data = data, family = "binomial")
 
 summary(mylogit)
 ```
