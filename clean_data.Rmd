@@ -1,0 +1,122 @@
+---
+title: "TEST"
+author: "Erika Vargas"
+date: "May 19, 2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#load data sorted by year and month to reflect the first sale of each producer/agent
+library(readxl)
+DATAORG <- read_excel("~/Desktop/SPRING 2019/CAPSTONE/DATAORG.xlsx")
+head(DATAORG)
+```
+
+```{r}
+# select distinct producers (eliminating duplicate)
+unique_producers <- subset(DATAORG, !duplicated(`Producer SalesForce Contact ID`))
+nrow(unique_producers)  #number of distinct agents/producers
+```
+
+```{r}
+# loading dataset that contains the y varibale "0", "1"
+# where 1 represents the first sale and 0 that it wasnt the first sale
+firstsale <- read_excel("salesDistinct.xlsx")
+class(firstsale)
+names(firstsale)[1] = c("Producer SalesForce Contact ID")
+str(firstsale)
+```
+
+```{r}
+#joining tables
+data <- merge(x = unique_producers, y = firstsale, by = "Producer SalesForce Contact ID", all = TRUE)
+head(data)
+```
+
+#cleaning the data
+```{r}
+data <- data[,-c(4,13,14,15,16,17,18,19,20,21)] #removes an empty and redundant columns
+str(data)
+
+#renaming columns
+names(data)[1:14] =
+  c("ProducerID","Ext_Channel", "Ext_Specialist", "Parent", "FirmName", "State", "PSuiteCT", "ProductName", "Year" , "Month", "FirstSaleAmount","Y2016","Y2017","Y2018")
+
+#since most of the variables are categorical I must convert them into factors
+library(aod)
+
+#changing character columns to factors 
+data <- mutate_at(data, vars(Ext_Channel,Ext_Specialist,Parent,FirmName,State,PSuiteCT, ProductName,Year, Month, Y2016,Y2017, Y2018), as.factor)
+
+str(data)
+summary(data)
+
+#delete rows that contain NA
+data <- na.omit(data)
+summary(data)
+str(data)
+nrow(data) # number of agents we are going to use for the analysis 
+```
+
+*Before looking at the first sale amount per agent, I want to see the top 10 producers/agents and the total amount of sales they produced*
+```{r}
+#total sales amount by producer
+SalesByProducer <- aggregate(`Production Amount`~`Producer SalesForce Contact ID`,data=DATAORG,FUN=sum)
+# top 10 Producers
+SalesByProducer %>%top_n(10)
+# Bottom 10 Producers
+SalesByProducer %>%top_n(-10)
+```
+
+```{r}
+
+```
+
+
+#2016 Analysis
+```{r}
+#amount of the first sale by year 2016-2018
+sales2016_ <- subset(data, Year == 2016)
+
+#looking at amount of the first sale by Month in 2016
+boxplot(log(FirstSaleAmount)~ Month,data=sales2016_, main="Sales in 2016", 
+   xlab="Month", ylab=" First Sale Amount")
+
+# Load function
+source("http://pcwww.liv.ac.uk/~william/R/crosstab.r")
+
+#row percentages for sales by month
+crosstab(data, row.vars = "Y2016", col.vars = "Month", type = "r")
+
+#row percentages for external channel first sellers
+crosstab(data, row.vars = "Y2016", col.vars = "Ext_Channel", type = "r")
+
+#row percentages for PSuite CT first sellers 
+crosstab(data, row.vars = "Y2016", col.vars = "PSuiteCT", type = "r")
+
+#row percentages for state first sellers 
+crosstab(data, row.vars = "Y2016", col.vars = "State", type = "r")
+```
+
+*Most of the first sales in 2016 happened in April, February, March, May. The monthS with less first sales are August, December, July, June, November, October September. Therefore, I can see that most of the first sales in 2016 happened in the first semester of the year.*
+
+*63.16% of first sales in 2016 used a bank as an external channel, 26.42% used a wirehouse, and 10.42% used an independent external channel*
+
+*61.46% of first sales in 2016 were FIA products, followed by 31.02%  for fixed Annuities, 6.61% for IA& ANNUITIZATIONS, 0% for RIA,and 0.90% for variable annuities*
+
+*California seems to be the state where most of the first sales (13.82%) in 2016 took place, followed by florida (8.38%), New York (8.38%),Texas (5.85%), OH (5.23%), PA (5.26%)*
+
+
+```{r}
+#LOGIT REGRESSION
+#Logistic regression, also called a logit model, is used to model dichotomous outcome variables, I n this case weather the produce had a first sale or not (1 or 0). In the logit model the log odds of the outcome is modeled as a linear combination of the predictor variables.
+
+mylogit <- glm(Y2016 ~ Ext_Channel + Ext_Specialist + Parent + FirmName + State + PSuiteCT + ProductName + Month + FirstSaleAmount, data = data, family = "binomial")
+
+summary(mylogit)
+```
+
