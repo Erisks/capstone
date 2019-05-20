@@ -107,15 +107,50 @@ crosstab(data, row.vars = "Y2016", col.vars = "State", type = "r")
 
 *61.46% of first sales in 2016 were FIA products, followed by 31.02%  for fixed Annuities, 6.61% for IA& ANNUITIZATIONS, 0% for RIA,and 0.90% for variable annuities*
 
-*California seems to be the state where most of the first sales (13.82%) in 2016 took place, followed by florida (8.38%), New York (8.38%),Texas (5.85%), OH (5.23%), PA (5.26%)*
+*California seems to be the state where most of the first sales (13.82%) in 2016 took place, followed by Florida (8.37%), New York (8.41%),Texas (5.87%), OH (5.18%), PA (5.24%)*
 
 
 ```{r}
 #LOGIT REGRESSION
 #Logistic regression, also called a logit model, is used to model dichotomous outcome variables, I n this case weather the produce had a first sale or not (1 or 0). In the logit model the log odds of the outcome is modeled as a linear combination of the predictor variables.
 
-mylogit <- glm(Y2016 ~ Ext_Channel + Ext_Specialist + State + PSuiteCT + ProductName + Month + FirstSaleAmount, data = data, family = "binomial")
+mylogit <- glm(Y2016 ~ Ext_Channel + Ext_Specialist + State + PSuiteCT + Month + FirstSaleAmount, data = data, family = "binomial")
 
 summary(mylogit)
+```
+
+```{r}
+plot(mylogit)
+
+#To get the significance for the overall model we use the following command:
+
+1-pchisq(16204-15837, 19028-18923)
+
+```
+*This is testing the null hypothesis that the model is no better (in terms of likelihood) than a model fit with only the intercept term, i.e. that all beta terms are 0.*
+
+#How do we test the association between firstsale and independent ext_channel?
+
+#H0: There is no association between firstsale and independent ext_channel (the odds ratio is equal to 1).
+#Ha: There is an association between firstsale and independent ext_channel (the odds ratio is not equal to 1).
+
+*When testing the null hypothesis that there is no association between between firstsale and independent ext_channel we reject the null hypothesis at the 0.05 alpha level (z = -2.94, p-value = 0.0033).*
+
+#I can also test for an overall effect of external channel using the wald.test function of the aod library
+#HO: The overall effect of external channel is significant
+#H1: the overall effect of external channel is NOT significant
+
+```{r}
+#for external channel
+library(aod)
+wald.test(b = coef(mylogit), Sigma = vcov(mylogit), Terms = 2:3)
+
+```
+
+The overall effect of external channel is significant 
+
+```{r}
+#backward elimination 
+step(mylogit,direction="backward",trace=FALSE)
 ```
 
