@@ -1,0 +1,330 @@
+---
+title: "Capstone final"
+author: "Erika Vargas"
+date: "June 15, 2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#load raw data
+library(readxl)
+agents <- read_excel("~/Desktop/SPRING 2019/CAPSTONE/DATAORG.xlsx")
+head(agents)
+
+#eliminates duplicates 
+agentsunique<- subset(agents, !duplicated(ContactID))
+nrow(agents)  #number of unique agents(contactID)
+
+#agregates sale amount 
+TOTALsale <- aggregate(x = agents$SaleAmount, by = list(agents$ContactID), FUN = sum)
+names(TOTALsale) <- c("ContactID", "totalsale")
+
+#combine dataframe that shows the total sale amount by agents
+SYMagents <- merge(agentsunique,TOTALsale,by= "ContactID")
+
+#deletes irrelevant columns
+SYMagents <- SYMagents[,-(13:15)]
+
+#CHECK FOR MISSING VALUES 
+sapply(SYMagents,function(x) sum(is.na(x))) 
+
+#there are 8 missing values for parent company and firm name. 5 values are missing for state. that is a total of 13 missing values 
+
+#deleting rows with NA values 
+SYMagents <- na.omit(SYMagents)
+nrow(SYMagents)
+
+#deleting observations for 2019 
+SYMagents <- subset(SYMagents, Year!="2019")
+
+
+#########  DATA IS CLEAN NOW #################
+str(SYMagents)
+
+#changing character columns to factors 
+library(dplyr)
+SYMagents <- mutate_at(SYMagents, vars(Channel,Specialist,`onlySale?`,Parent,FirmName,State,PSuiteCT, Product,Year, Month), as.factor)
+str(SYMagents)
+
+summary(SYMagents)
+
+```
+
+
+
+```{r}
+library(caret)
+library(arm) #residuals of logistic regression 
+library(pROC); library(plotROC) # plots ROC curve
+library(BaylorEdPsych) #Returns various pseudo-R^2 statistics
+
+#first model with all the variables
+modelfull <- glm(`onlySale?` ~ Channel + Specialist + PSuiteCT + State + Year + Month + totalsale, family=binomial(link='logit'),data=SYMagents)
+
+anova(modelfull, test="Chisq")
+
+PseudoR2(modelfull)
+
+varImp(modelfull)
+
+#odds ratios 
+round(exp(coef(modelfull)),2)
+
+#Statistical Tests for Individual Predictors
+#Wald Test If the alpha < 0.05,reject the null hypothesis and accept that the variable should be included in the model. if  alpha > 0.05 those explanatory variables can be omitted from the model.
+
+library(survey)
+regTermTest(modelfull, "Channel")   #p- value 0.00000 --- significant 
+regTermTest(modelfull, "Specialist")  #p-value= 0.089 ---- not significant
+regTermTest(modelfull, "PSuiteCT")    #p-value= 0.00000-- significant
+regTermTest(modelfull, "State")       #p-value= 0.7432 --- not significant
+regTermTest(modelfull, "Year")        #p-value= 0.00000 ---- significant
+regTermTest(modelfull, "Month")       #p-value= 0.0005 ---- significant
+regTermTest(modelfull, "totalsale")   #p-value= 0.0000-- significant 
+
+#residual plots
+plot(modelfull)
+
+binnedplot(fitted(modelfull), 
+           residuals(modelfull, type = "response"), 
+           nclass = NULL, 
+           xlab = "Expected Values",
+           ylab = "Average residual", 
+           main = "Binned residual plot", 
+           cex.pts = 0.8, 
+           col.pts = 1, 
+           col.int = "gray")
+
+#ROC curve 
+invisible(plot(roc(factor(ifelse(SYMagents$`onlySale?` == "TRUE", 1, 0)), fitted(modelfull)), print.thres = c(.1, .5), col = "red", print.auc = T))
+```
+
+
+
+
+
+```{r}
+#Second Model total sale was excluded
+#Bayesian Analysis 
+fit <- bayesglm(`onlySale?` ~ Channel + Specialist + PSuiteCT + State + Year + Month , data=SYMagents, family="binomial")
+fit1<- glm(`onlySale?` ~ Channel + Specialist + PSuiteCT + State + Year + Month , family=binomial(link='logit'),data=SYMagents)
+plot(fit1)
+
+summary(fit)
+
+#odds ratios 
+round(exp(coef(fit)),2)
+
+#Statistical Tests for Individual Predictors
+#Wald Test If the alpha < 0.05,reject the null hypothesis and accept that the variable should be included in the model. if  alpha > 0.05 those explanatory variables can be omitted from the model.
+
+library(survey)
+regTermTest(fit, "Channel")   #p- value 0.00000 --- significant 
+regTermTest(fit, "Specialist")  #p-value= 0.001 ---- significant
+regTermTest(fit, "PSuiteCT")    #p-value= 0.00000-- significant
+regTermTest(fit, "State")       #p-value= 0.1798 --- not significant
+regTermTest(fit, "Year")        #p-value= 0.00000 ---- significant
+regTermTest(fit, "Month")       #p-value= 0.0005 ---- significant
+
+anova(fit,test="Chisq")
+PseudoR2(fit)
+
+#residual plot
+binnedplot(fitted(fit), 
+           residuals(fit, type = "response"), 
+           nclass = NULL, 
+           xlab = "Expected Values",
+           ylab = "Average residual", 
+           main = "Binned residual plot", 
+           cex.pts = 0.8, 
+           col.pts = 1, 
+           col.int = "gray")
+
+#ROC curve 
+invisible(plot(roc(factor(ifelse(SYMagents$`onlySale?` == "TRUE", 1, 0)), fitted(fit)), print.thres = c(.1, .5), col = "red", print.auc = T))
+
+```
+
+```{r}
+#changing the level of the channel dummy varibale 
+levels(SYMagents$Channel)
+SYMagents$Channel <- relevel(SYMagents$Channel, ref="INDEPENDENT")
+levels(SYMagents$Channel)
+
+```
+
+
+
+```{r}
+#Third Model
+#model 1 without state 
+model1 <- glm(`onlySale?` ~ Channel + Specialist + PSuiteCT + Year + Month, family=binomial(link='logit'),data=SYMagents)
+
+anova(model1, test="Chisq")
+
+summary(model1)
+
+library(survey)
+regTermTest(model1, "Channel")     #p-value 0.00000 --- significant 
+regTermTest(model1, "Specialist")  #p-value= 0.000 ---- significant
+regTermTest(model1, "PSuiteCT")    #p-value= 0.00000-- significant
+regTermTest(model1, "Year")        #p-value= 0.00000 ---- significant
+regTermTest(model1, "Month")       #p-value= 0.0000 ---- significant
+
+ #Returns various pseudo-R^2 statistics
+PseudoR2(model1)
+
+#odds ratios 
+round(exp(coef(model1)),2)
+contrasts(SYMagents$PSuiteCT)
+
+#residual plots
+plot(model1)
+
+binnedplot(fitted(model1), 
+           residuals(model1, type = "response"), 
+           nclass = NULL, 
+           xlab = "Expected Values",
+           ylab = "Average residual", 
+           main = "Binned residual plot", 
+           cex.pts = 0.8, 
+           col.pts = 1, 
+           col.int = "gray")
+
+#ROC curve 
+invisible(plot(roc(factor(ifelse(SYMagents$`onlySale?` == "TRUE", 1, 0)), fitted(model1)), print.thres = c(.1, .5), col = "red", print.auc = T))
+```
+
+
+```{r}
+#comparison of the three  models
+anova(modelfull,fit, model1,test = "Chisq")
+
+```
+*we can compare the models using the ANOVA test. Let's say our null hypothesis is that third is better than the second model. p < 0.05 would reject our hypothesis and in case p > 0.05, we'll fail to reject the null hypothesis.*
+
+*With p > 0.05, this ANOVA test also corroborates the fact that the third model is better than second and first model.*
+
+
+```{r}
+library(pROC); library(plotROC)
+invisible(plot(roc(SYMagents$`onlySale?`,
+                   fitted(modelfull)),
+               col = "red", 
+               main = "ROC curves: logistic model full(red) vs. logistic model fit(blue)"))
+
+invisible(plot(roc(SYMagents$`onlySale?`,
+                   fitted(fit)),
+               print.auc = T, 
+               col = "blue", 
+               add = T))
+```
+
+```{r}
+invisible(plot(roc(SYMagents$`onlySale?`,
+                   fitted(fit)),
+               col = "red", 
+               main = "ROC curves: logistic model fit(red) vs. logistic model 1 (blue)"))
+
+invisible(plot(roc(SYMagents$`onlySale?`,
+                   fitted(model1)),
+               print.auc = T, 
+               col = "blue", 
+               add = T))
+
+#ROC curve model 1
+invisible(plot(roc(factor(ifelse(SYMagents$`onlySale?` == "TRUE", 1, 0)), fitted(model1)), print.thres = c(.1, .5), col = "red", print.auc = T))
+
+```
+
+
+```{r}
+#analysis of last year 2018 using the last model
+data2018 <- subset(SYMagents, SYMagents$Year == 2018)
+
+#model 1 without state 
+model2018 <- glm(`onlySale?` ~ Channel + Specialist +PSuiteCT+ Month, family=binomial(link='logit'),data=data2018)
+
+anova(model2018, test="Chisq")
+
+summary(model2018)
+#odds ratios 
+round(exp(coef(model2018)),2)
+
+library(survey)
+regTermTest(model2018, "Channel")     #p-value 0.00000 --- significant 
+regTermTest(model2018, "Specialist")  #p-value= 0.000 ---- significant
+regTermTest(model2018, "PSuiteCT")    #p-value= 0.00000-- significant
+regTermTest(model2018, "Month")       #p-value= 0.0000 ---- significant
+
+
+ #Returns various pseudo-R^2 statistics
+PseudoR2(model2018)
+
+#residual plots
+plot(model2018)
+
+binnedplot(fitted(model2018), 
+           residuals(model2018, type = "response"), 
+           nclass = NULL, 
+           xlab = "Expected Values",
+           ylab = "Average residual", 
+           main = "Binned residual plot", 
+           cex.pts = 0.8, 
+           col.pts = 1, 
+           col.int = "gray")
+
+#ROC curve 
+invisible(plot(roc(factor(ifelse(data2018$`onlySale?` == "TRUE", 1, 0)), fitted(model2018)), print.thres = c(.1, .5), col = "red", print.auc = T))
+```
+
+```{r}
+#analysis of last year 2014
+data2014 <- subset(SYMagents, SYMagents$Year == 2014)
+
+#model 1 without state 
+model2014 <- glm(`onlySale?` ~ Channel + Specialist +PSuiteCT+ Month, family=binomial(link='logit'),data=data2014)
+
+anova(model2014, test="Chisq")
+
+summary(model2014)
+#odds ratios 
+round(exp(coef(model2014)),2)
+
+library(survey)
+regTermTest(model2014, "Channel")     #p-value 0.00000 --- significant 
+regTermTest(model2014, "Specialist")  #p-value= 0.000 ---- significant
+regTermTest(model2014, "PSuiteCT")    #p-value= 0.00000-- significant
+regTermTest(model2014, "Month")       #p-value= 0.0000 ---- significant
+
+
+ #Returns various pseudo-R^2 statistics
+library(BaylorEdPsych)
+PseudoR2(model2014)
+
+#residual plots
+plot(model2014)
+
+binnedplot(fitted(model2014), 
+           residuals(model2014, type = "response"), 
+           nclass = NULL, 
+           xlab = "Expected Values",
+           ylab = "Average residual", 
+           main = "Binned residual plot", 
+           cex.pts = 0.8, 
+           col.pts = 1, 
+           col.int = "gray")
+
+#ROC curve 
+invisible(plot(roc(factor(ifelse(data2014$`onlySale?` == "TRUE", 1, 0)), fitted(model2014)), print.thres = c(.2, .6), col = "red", print.auc = T))
+```
+
+*Summary regression results*
+```{r}
+library(stargazer)
+stargazer(modelfull,fit, model1,model2014, model2018, TITLE="Logistic Regression Results" , kee.stat = c("n", "rsq"), align = TRUE, font.size = "small", type = "text") 
+```
